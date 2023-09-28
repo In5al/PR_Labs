@@ -1,35 +1,33 @@
+
 import requests
 import json
 from bs4 import BeautifulSoup
 
 def crawling(url, max_num_page=None, start_page=1):
-    arr = []
+    parsed_links = []
 
-    if max_num_page is not None and start_page > max_num_page:
-        return arr
+    while max_num_page is None or start_page <= max_num_page:
+        response = requests.get(url.format(start_page))
 
-    response = requests.get(url.format(start_page))
+        if response.status_code == 200:
+            soup = BeautifulSoup(response.text, "html.parser")
+            links = soup.select(".block-items__item__title")
 
-    if response.status_code == 200:
-        soup = BeautifulSoup(response.text, "html.parser")
-        links = soup.select(".block-items__item__title")
+            for link in links:
+                href = link.get("href")
+                if href and "/booster/" not in href:
+                    parsed_links.append("https://999.md" + href)
 
-        for link in links:
-            href = link.get("href")
-            if href and "/booster/" not in href:
-                arr.append("https://999.md" + href)
+            next_page_links = soup.select(".pagination__item--next a")
+            if not next_page_links:
+                break
 
-        next_page_links = soup.select(".pagination__item--next a")
-        if next_page_links:
-            next_page_url = next_page_links[0].get("href")
-            if next_page_url:
-                next_page = int(next_page_url.split("page=")[-1])
-                arr.extend(crawling(url, max_num_page, next_page))
+            start_page += 1
+        else:
+            print(f"Failed to retrieve the web page. Status code: {response.status_code}")
+            break
 
-    else:
-        print(f"Failed to retrieve the web page. Status code: {response.status_code}")
-
-    return arr
+    return parsed_links
 
 if __name__ == "__main__":
     url_template = "https://m.999.md/ro/list/transport/cars?page={}"
