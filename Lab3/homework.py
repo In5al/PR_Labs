@@ -3,9 +3,10 @@ import json
 from bs4 import BeautifulSoup
 
 def extract_product_details(url):
-    response = requests.get(url)
+    try:
+        response = requests.get(url)
+        response.raise_for_status()
 
-    if response.status_code == 200:
         soup = BeautifulSoup(response.text, "html.parser")
 
         title = soup.find("header", class_="adPage__header").text.strip()
@@ -32,14 +33,14 @@ def extract_product_details(url):
 
         return product_details
 
-    else:
-        print(f"Failed to retrieve the product page. Status code: {response.status_code}")
+    except requests.exceptions.RequestException as e:
+        print(f"Failed to retrieve the product page: {e}")
         return None
 
-url = "https://999.md/ro/84212119"
-details = extract_product_details(url)
+if __name__ == "__main__":
+    url = "https://999.md/ro/84212119"
+    details = extract_product_details(url)
 
-if details:
-    json_details = json.dumps(details, indent=4, ensure_ascii=False)
-    print(json_details)
-
+    if details:
+        json_details = json.dumps(details, indent=4, ensure_ascii=False)
+        print(json_details)
