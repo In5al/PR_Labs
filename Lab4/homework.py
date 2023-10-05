@@ -1,62 +1,60 @@
-import socket
+import requests
+from bs4 import BeautifulSoup
 import re
-import json
 
-HOST = '127.0.0.1'
-PORT = 8080
+BASE_URL = 'http://127.0.0.1:8080'
 
-def make_request(path):
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as client_socket:
-        client_socket.connect((HOST, PORT))
-        request = f"GET {path} HTTP/1.1\r\nHost: {HOST}:{PORT}\r\n\r\n"
-        client_socket.send(request.encode('utf-8'))
-        response = client_socket.recv(1024).decode('utf-8')
-    return response
+def fetch_page_content(path):
+    try:
+        response = requests.get(f'{BASE_URL}{path}')
+        response.raise_for_status()
+        return response.text
+    except requests.exceptions.RequestException as e:
+        print(f'Error fetching page content: {e}')
+        return None
 
-def parse_page(response):
-    page_content = re.search(r'HTTP/1\.1 \d+ OK\r\nContent-Type: text/html\r\n\r\n(.*)', response, re.DOTALL)
-    return page_content.group(1).strip() if page_content else response.strip()
-
-def parse_product_page(response):
+def parse_product_details(html):
+    soup = BeautifulSoup(html, 'html.parser')
     product_details = {}
     fields = ["name", "author", "price", "description"]
+
     for field in fields:
-        match = re.search(fr'<h1>{field.capitalize()}:(.*?)</h1>', response)
-        if match:
-            product_details[field] = match.group(1).strip()
+        element = soup.find('h1', text=re.compile(fr'{field.capitalize()}:', re.IGNORECASE))
+        if element:
+            product_details[field] = element.find_next('h1').text.strip()
+
     return product_details
 
-def extract_product_links(response):
-    product_links = re.findall(r'<a href=\'/product/(\d+)\'>', response)
-    return [f'/product/{link}' for link in product_links]
+def extract_product_links(html):
+    soup = BeautifulSoup(html, 'html.parser')
+    product_links = [a['href'] for a in soup.find_all('a', href=re.compile(r'^/product/\d+'))]
+    return product_links
 
 def main():
-    page_dict = {}
-    pages = [('/home', 'Home'), ('/about', 'About')]
+    page_paths = ['/home', '/about']
+    product_list_path = '/products'
 
-    for path, page_name in pages:
-        page_response = make_request(path)
-        page_content = parse_page(page_response)
-        page_dict[page_name] = page_content
+    for page_path in page_paths:
+        page_html = fetch_page_content(page_path)
+        if page_html:
+            page_content = parse_page_content(page_html)
+            print(f'{page_path} Page:\n{page_content}\n')
 
-    product_listing_response = make_request('/products')
-    product_links = extract_product_links(product_listing_response)
-    product_dict = {}
+    product_list_html = fetch_page_content(product_list_path)
+    if product_list_html:
+        product_links = extract_product_links(product_list_html)
+        product_dict = {}
 
-    for link in product_links:
-        product_response = make_request(link)
-        product_details = parse_product_page(product_response)
-        product_dict[link] = product_details
+        for product_link in product_links:
+            product_html = fetch_page_content(product_link)
+            if product_html:
+                product_details = parse_product_details(product_html)
+                product_dict[product_link] = product_details
 
-    for page_name, content in page_dict.items():
-        print(f"{page_name} Page:")
-        print(content)
-        print("\n")
-
-    for link, details in product_dict.items():
-        print(f"Product URL: {link}")
-        print(json.dumps(details, indent=4))
-        print("\n")
+        for product_link, product_details in product_dict.items():
+            print(f'Product URL: {BASE_URL}{product_link}')
+            print(json.dumps(product_details, indent=4))
+            print()
 
 if __name__ == "__main__":
     main()
