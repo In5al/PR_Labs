@@ -6,7 +6,8 @@ def main() -> None:
     crawler = Crawler()
 
     # Define the URL and parameters for link extraction
-    url = "https://999.md/ro/list/real-estate/apartments-and-rooms?applied=1&eo=12900&eo=12912&eo=12885&eo=13859&ef=32&ef=33&o_33_1=776"
+    url = ""https://m.999.md/ro/list/transport/cars?page={}"
+    max_pages = 3"
     pagesToProcess = 10
     pageStart = 1
 
